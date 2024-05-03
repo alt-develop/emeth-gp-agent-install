@@ -212,7 +212,7 @@ if [ ! "$config_overwrite" = 'n' ]; then
     if [ "$gpu_passthrough_agreement" = 'y' ]; then
         for gpu_pci_address in ${gpu_pci_addresses}
         do
-            echo "  - ${gpu_pci_address}" | sudo tee -a "$CONFIG"
+            echo "  - '${gpu_pci_address}'" | sudo tee -a "$CONFIG"
         done
     fi
 fi
