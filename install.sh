@@ -209,7 +209,7 @@ if [ ! "$config_overwrite" = 'n' ]; then
     echo "gpu_model_name: ${gpu_model_name}" | sudo tee -a "$CONFIG"
     echo "gpu_pci_adresses:" | sudo tee -a "$CONFIG"
     if [ "$gpu_passthrough_agreement" = 'y' ]; then
-        for gpu_pci_address in "${gpu_pci_addresses}"
+        for gpu_pci_address in ${gpu_pci_addresses}
         do
             echo "  - ${gpu_pci_address}" | sudo tee -a "$CONFIG"
         done

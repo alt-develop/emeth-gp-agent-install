@@ -12,7 +12,7 @@
 - Vagrant
 
 ## Install
-   
+
 ```sh
 curl -sOL https://raw.githubusercontent.com/alt-develop/egp-agent/main/install.sh
 sh install.sh
