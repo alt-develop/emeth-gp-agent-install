@@ -71,6 +71,7 @@ echo ''
 
 # Get the resource allocation amounts desired by the user
 ## Get the machine specs
+sudo update-pciids
 gpu_devices=$(lspci -nn | grep 'NVIDIA' | grep '3D controller\|VGA compatible controller')
 cpu_model_name=$(grep 'model name' /proc/cpuinfo | head -1 | awk -F': ' '{print $2}')
 vcpu_total=$(grep -c ^processor /proc/cpuinfo)
