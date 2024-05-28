@@ -138,7 +138,7 @@ if [ "$vcpu_limit" -lt 1 ] || [ "$vcpu_limit" -gt "$vcpu_limit_max" ]; then
 fi
 
 ### Memory
-memory_limit_max=$((memory_total-2))
+memory_limit_max=$((memory_total-(memory_total/10)))
 read -p "Enter the amount of memory to allocate in GB (1-${memory_limit_max}) [${memory_limit_max}]: " memory_limit
 memory_limit=${memory_limit:-"$memory_limit_max"}
 if [ "$memory_limit" -lt 1 ] || [ "$memory_limit" -gt "$memory_limit_max" ]; then
@@ -147,11 +147,11 @@ if [ "$memory_limit" -lt 1 ] || [ "$memory_limit" -gt "$memory_limit_max" ]; the
 fi
 
 ### Storage
-storage_limit_max_gb=$(($storage_total_gb-5))
-read -p "Enter the amount of storage to allocate in GB (200-${storage_limit_max_gb}) [${storage_limit_max_gb}]: " storage_limit_gb
-storage_limit_gb=${storage_limit_gb:-"$storage_limit_max_gb"}
-if [ "$storage_limit_gb" -lt 200 ] || [ "$storage_limit_gb" -gt "$storage_limit_max_gb" ]; then
-    echo "Invalid storage limit. Please enter a value between 200 and $storage_limit_max_gb GB."
+storage_limit_max_gb="$storage_total_gb"
+read -p "Enter the amount of storage to allocate in GB ${MINIMUM_REQUIRED_STORAGE_GB}-${storage_limit_max_gb}) [$((storage_limit_max_gb-20))]: " storage_limit_gb
+storage_limit_gb=${storage_limit_gb:-"$((storage_limit_max_gb-20))"}
+if [ "$storage_limit_gb" -lt "$MINIMUM_REQUIRED_STORAGE_GB" ] || [ "$storage_limit_gb" -gt "$storage_limit_max_gb" ]; then
+    echo "Invalid storage limit. Please enter a value between $MINIMUM_REQUIRED_STORAGE_GB and $storage_limit_max_gb GB."
     exit 1
 fi
 
