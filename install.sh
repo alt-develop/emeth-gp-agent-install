@@ -254,7 +254,7 @@ echo "export VAGRANT_HOME=${storage_mount_path}/.vagrant.d" | sudo tee /home/"$O
 ## GPU Passthrough
 if [ "$gpu_passthrough_agreement" = 'y' ]; then
     echo 'Setting up GPU passthrough...'
-    echo "GRUB_CMDLINE_LINUX=\"noresume nomodeset intel_iommu=on iommu=pt vfio-pci.ids=${gpu_pci_ids} module_blacklist=nvidia\"" | sudo tee /etc/default/grub.d/egp-gpu-passthrough.cfg
+    echo "GRUB_CMDLINE_LINUX=\"noresume nomodeset intel_iommu=on iommu=pt vfio-pci.ids=${gpu_pci_ids} module_blacklist=nvidia nvidia.NVreg_NvLinkDisable=1\"" | sudo tee /etc/default/grub.d/egp-gpu-passthrough.cfg
     sudo update-grub
 fi
 
