@@ -5,25 +5,23 @@ OS_USER_NAME="egp-user"
 CONFIG="/home/${OS_USER_NAME}/egp-agent-config.yaml"
 MINIMUM_REQUIRED_STORAGE_GB=200 # 200GB
 DEFAULT_INSTALL_DIR='/opt/egp_agent'
+TMPFILE="/tmp/egp-agent-install.tmp"
 
 
 # Check if the required packages are installed
-if ! kvm --version >/dev/null 2>&1; then
-    echo 'This program requires kvm to be installed.'
-    missing_pkg=true
-fi
-if ! qemu-img --version >/dev/null 2>&1; then
-    echo 'This program requires qemu-img to be installed.'
-    missing_pkg=true
-fi
-if ! virsh --version >/dev/null 2>&1; then
-    echo 'This program requires virsh to be installed.'
-    missing_pkg=true
-fi
-if ! fio --version  >/dev/null 2>&1; then
-    echo 'This program requires fio to be installed.'
-    missing_pkg=true
-fi
+missing_pkg=false
+
+check_package() {
+    if ! "$1" --version >/dev/null 2>&1; then
+        echo "This program requires $1 to be installed."
+        missing_pkg=true
+    fi
+}
+
+check_package kvm
+check_package qemu-img
+check_package virsh
+check_package fio
 
 if [ "$missing_pkg" = true ]; then
     echo 'Missing packages detected.'
@@ -37,11 +35,6 @@ fi
 
 if ! vagrant --version >/dev/null 2>&1; then
     echo 'This program requires vagrant to be installed.'
-    missing_pkg=true
-fi
-
-if [ "$missing_pkg" = true ]; then
-    echo 'Missing packages detected.'
     echo 'To continue, please install Vagrant by following the instructions at:'
     echo '--------------------------------------------'
     echo 'https://developer.hashicorp.com/vagrant/install'
@@ -59,14 +52,13 @@ H   H  E     L     L     O   O     U   U     S E     R  R
 H   H  EEEEE LLLLL LLLLL  OOO       UUU  SSSS  EEEEE R   R 
 
 \e[0m'
-echo 'Please enter the your API key for the EMETH GPU POOL.'
+echo 'Please enter your API key for the EMETH GPU POOL.'
 echo '--------------------------------------------'
 read -p 'API Key: ' api_key
 if [ -z "$api_key" ]; then
     echo 'API key is required.'
     exit 1
 fi
-echo ''
 echo ''
 
 # Get the resource allocation amounts desired by the user
@@ -115,12 +107,30 @@ Please be aware that if you proceed, this program will modify the grub settings 
 As a result of these changes, you will not be able to directly access the GPU from the Host OS.\e[0m"
     echo '--------------------------------------------'
     read -p 'Do you want to proceed with the GPU passthrough? (y/n) [y]: ' gpu_passthrough_agreement
-    echo "$gpu_passthrough_agreement"
     gpu_passthrough_agreement=${gpu_passthrough_agreement:-'y'}
     if [ "$gpu_passthrough_agreement" = "y" ]; then
         gpu_model_name=$(echo "$gpu_devices" | awk -F'[' '{print $3}' | awk -F']' '{print $1}' | head -1)
-        gpu_pci_ids=$(echo "$gpu_devices" | awk -F']:' '{print $2}' | awk -F'[' '{print $3}' | awk -F']' '{print $1}' | uniq | sed 's/ /,/g')
+        gpu_pci_ids=$(echo "$gpu_devices" | awk -F']:' '{print $2}' | awk -F'[' '{print $3}' | awk -F']' '{print $1}' | uniq | tr '\n' ',' | sed 's/,$//')
+
+        # Get the pci addresses for GPU passthrough
+        true > "$TMPFILE" # clear the tmpfile
         gpu_pci_addresses=$(echo "$gpu_devices" | awk -F' ' '{print $1}')
+        iommu_groups=$(find /sys/kernel/iommu_groups/ -type l)
+
+        for gpu_pci_address in ${gpu_pci_addresses}
+        do
+            iommu_group_no=$(echo "$iommu_groups" | grep "$gpu_pci_address" | awk -F'/' '{print $5}') # output example: 14
+            immmu_group_device_count=$(echo "$iommu_groups" | grep "/sys/kernel/iommu_groups/${iommu_group_no}" | wc -l)
+            if [ "$immmu_group_device_count" -gt 1 ]; then
+                iommu_group_devices=$(echo "$iommu_groups" | grep "/sys/kernel/iommu_groups/${iommu_group_no}" | awk -F' ' '{print $5}')
+                iommu_group_pci_addresses_csv=$(echo "$iommu_groups" | grep "/sys/kernel/iommu_groups/${iommu_group_no}" | awk -F'/' '{print $7}' | awk -F':' '{print $2":"$3}' | tr '\n' ',' | sed 's/,$//')
+                echo "$iommu_group_pci_addresses_csv" >> "$TMPFILE"
+            else
+                echo "$gpu_pci_address" >> "$TMPFILE"
+            fi
+        done
+        passthrough_pci_addresses=$(cat "$TMPFILE")
+        rm -f "$TMPFILE"
     else
         echo 'GPU passthrough canceled.'
     fi
@@ -148,7 +158,7 @@ fi
 
 ### Storage
 storage_limit_max_gb="$storage_total_gb"
-read -p "Enter the amount of storage to allocate in GB ${MINIMUM_REQUIRED_STORAGE_GB}-${storage_limit_max_gb}) [$((storage_limit_max_gb-20))]: " storage_limit_gb
+read -p "Enter the amount of storage to allocate in GB (${MINIMUM_REQUIRED_STORAGE_GB}-${storage_limit_max_gb}) [$((storage_limit_max_gb-20))]: " storage_limit_gb
 storage_limit_gb=${storage_limit_gb:-"$((storage_limit_max_gb-20))"}
 if [ "$storage_limit_gb" -lt "$MINIMUM_REQUIRED_STORAGE_GB" ] || [ "$storage_limit_gb" -gt "$storage_limit_max_gb" ]; then
     echo "Invalid storage limit. Please enter a value between $MINIMUM_REQUIRED_STORAGE_GB and $storage_limit_max_gb GB."
@@ -210,9 +220,9 @@ if [ ! "$config_overwrite" = 'n' ]; then
     echo "gpu_model_name: ${gpu_model_name}" | sudo tee -a "$CONFIG"
     echo "gpu_pci_adresses:" | sudo tee -a "$CONFIG"
     if [ "$gpu_passthrough_agreement" = 'y' ]; then
-        for gpu_pci_address in ${gpu_pci_addresses}
+        for pci_addresses_csv in ${passthrough_pci_addresses}
         do
-            echo "  - '${gpu_pci_address}'" | sudo tee -a "$CONFIG"
+            echo "  - '${pci_addresses_csv}'" | sudo tee -a "$CONFIG"
         done
     fi
 fi
@@ -252,7 +262,7 @@ fi
 echo "export VAGRANT_HOME=${storage_mount_path}/.vagrant.d" | sudo tee /home/"$OS_USER_NAME"/.profile
 
 ## GPU Passthrough
-if [ "$gpu_passthrough_agreement" = 'y' ]; then
+if [ "$gpu_passthrough_agreement" = "y" ]; then
     echo 'Setting up GPU passthrough...'
     echo "GRUB_CMDLINE_LINUX=\"noresume nomodeset intel_iommu=on iommu=pt vfio-pci.ids=${gpu_pci_ids} module_blacklist=nvidia nvidia.NVreg_NvLinkDisable=1\"" | sudo tee /etc/default/grub.d/egp-gpu-passthrough.cfg
     sudo update-grub
@@ -317,9 +327,36 @@ sudo systemctl start egp-agent
 
 
 # Reboot
-echo 'Install completed successfully.'
-echo 'Please reboot the system to apply the changes.'
-read -p 'Do you want to reboot now? (y/n) [y]: ' reboot
-if [ "$reboot" != "n" ]; then
-    sudo reboot
+echo ''
+echo 'Installation and configuration complete.'
+if [ "$gpu_passthrough_agreement" = "y" ]; then
+    echo 'Please reboot your system to apply GPU passthrough settings.'
+    read -p 'Do you want to reboot now? (y/n) [y]: ' reboot
+    if [ "$reboot" != "n" ]; then
+        sudo reboot
+    fi
 fi
+echo ''
+
+echo 'egp-agent is now running.'
+echo 'You can check the status by running the following command:'
+echo '--------------------------------------------'
+echo 'sudo systemctl status egp-agent'
+echo ''
+echo 'You can also check the logs by running the following command:'
+echo '--------------------------------------------'
+echo 'sudo journalctl -u egp-agent -f'
+echo ''
+echo 'To stop the service, run the following command:'
+echo '--------------------------------------------'
+echo 'sudo systemctl stop egp-agent'
+echo ''
+echo 'To disable the service, run the following command:'
+echo '--------------------------------------------'
+echo 'sudo systemctl disable egp-agent'
+echo 'sudo rm /etc/systemd/system/egp-agent.service'
+echo 'sudo systemctl daemon-reload'
+echo ''
+
+# End of the script
+exit 0
