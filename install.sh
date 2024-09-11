@@ -24,6 +24,11 @@ if ! fio --version  >/dev/null 2>&1; then
     echo 'This program requires fio to be installed.'
     missing_pkg=true
 fi
+if ! guestfish --version  >/dev/null 2>&1; then
+    echo 'This program requires libguestfs-tools to be installed.'
+    missing_pkg=true
+fi
+
 
 if [ "$missing_pkg" = true ]; then
     echo 'Missing packages detected.'
@@ -31,7 +36,7 @@ if [ "$missing_pkg" = true ]; then
     echo '--------------------------------------------'
     echo 'sudo apt-get update \'
     echo '&& sudo apt-get upgrade -y \'
-    echo '&& sudo apt-get install -y qemu-kvm qemu-utils libvirt-daemon-system libvirt-clients libvirt-dev bridge-utils virt-manager ovmf fio curl'
+    echo '&& sudo apt-get install -y qemu-kvm qemu-utils libvirt-daemon-system libvirt-clients libvirt-dev libguestfs-tools bridge-utils virt-manager ovmf fio curl'
     exit 1
 fi
 
