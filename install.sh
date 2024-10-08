@@ -328,6 +328,8 @@ Group=${OS_USER_NAME}
 ExecStart=/home/${OS_USER_NAME}/egp-agent --config ${CONFIG}
 Restart=always
 RestartSec=5s
+KillMode=process
+KillSignal=SIGHUP
 
 [Install]
 WantedBy=multi-user.target
