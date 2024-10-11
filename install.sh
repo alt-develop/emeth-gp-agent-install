@@ -278,9 +278,9 @@ fi
 echo 'download update.sh file...'
 sudo curl -o /home/"$OS_USER_NAME"/update.sh https://raw.githubusercontent.com/alt-develop/egp-agent/main/update.sh
 
-UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
+COMMAND_UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
 # Ensure the update script is executable
-sudo chmod +x $UPDATE_SCRIPT
+sudo chmod +x $COMMAND_UPDATE_SCRIPT
 
 # Generate random time for the job
 RANDOM_HOUR=$(shuf -i 0-23 -n 1)
@@ -293,16 +293,19 @@ CRON_SCHEDULE="$RANDOM_MINUTE $RANDOM_HOUR $TOMORROW $MONTH *"
 CRON_JOB="$CRON_SCHEDULE $COMMAND_UPDATE_SCRIPT"
 
 # Check if a cron job exists for today
-EXISTING_CRON_JOB=$(crontab -l 2>/dev/null | grep "$COMMAND_UPDATE_SCRIPT")
+EXISTING_CRON_JOB=$(crontab -l 2>/dev/null | grep -F "$COMMAND_UPDATE_SCRIPT")
 
 if [ -n "$EXISTING_CRON_JOB" ]; then
   # Remove the existing cron job for today
-  (crontab -l 2>/dev/null | grep -v "$COMMAND_UPDATE_SCRIPT") | crontab -
+  (crontab -l 2>/dev/null | grep -v -F "$COMMAND_UPDATE_SCRIPT") | crontab -
   echo "Existing cron job for today removed: $EXISTING_CRON_JOB"
   echo "Adding new cron job for tomorrow: $CRON_JOB"
 else
   echo "No existing cron job for today. Adding new cron job for tomorrow: $CRON_JOB"
 fi
+
+# Add the new cron job for tomorrow
+(crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
 
 # Permission setup
 sudo mkdir -p /home/"$OS_USER_NAME"/.ssh
