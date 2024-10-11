@@ -2,6 +2,28 @@
 
 # Set constant variables
 OS_USER_NAME="egp-user"
+COMMAND_UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
+KEY_JOB_UPDATE="#JOB_UPDATE"
+
+RANDOM_HOUR=$(shuf -i 0-23 -n 1)
+RANDOM_MINUTE=$(shuf -i 1-59 -n 1)
+TOMORROW=$(date -d "tomorrow" +%d)
+MONTH=$(date +%m)
+YEAR=$(date +%Y)
+CRON_SCHEDULE="$RANDOM_MINUTE $RANDOM_HOUR $TOMORROW $MONTH *"
+CRON_JOB="$CRON_SCHEDULE $COMMAND_UPDATE_SCRIPT $KEY_JOB_UPDATE"
+
+crontab -l 2>/dev/null | grep -F "$KEY_JOB_UPDATE" > /dev/null
+if [ $? -eq 0 ]; then
+    echo "Cron #JOB_UPDATE already exists, will be overwritten."
+    (crontab -l 2>/dev/null | grep -v "$KEY_JOB_UPDATE") | crontab -
+else
+    echo "Cron #JOB_UPDATE does not exist yet, will be created."
+fi
+
+(crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+
+echo "Cron job has been updated to run at $RANDOM_HOUR:$RANDOM_MINUTE at $TOMORROW/$MONTH/$YEAR"
 
 # get version new of egp-agent
 echo 'download new version of egp-agent'
