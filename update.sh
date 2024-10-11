@@ -2,6 +2,32 @@
 
 # Set constant variables
 OS_USER_NAME="egp-user"
+COMMAND_UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
+
+# Generate random time for the job
+RANDOM_HOUR=$(shuf -i 0-23 -n 1)
+RANDOM_MINUTE=$(shuf -i 1-59 -n 1)
+
+# Set schedule for tomorrow
+TOMORROW=$(date -d "tomorrow" +%d)
+MONTH=$(date +%m)
+CRON_SCHEDULE="$RANDOM_MINUTE $RANDOM_HOUR $TOMORROW $MONTH *"
+CRON_JOB="$CRON_SCHEDULE $COMMAND_UPDATE_SCRIPT"
+
+# Check if a cron job exists for today
+EXISTING_CRON_JOB=$(crontab -l 2>/dev/null | grep "$COMMAND_UPDATE_SCRIPT")
+
+if [ -n "$EXISTING_CRON_JOB" ]; then
+  # Remove the existing cron job for today
+  (crontab -l 2>/dev/null | grep -v "$COMMAND_UPDATE_SCRIPT") | crontab -
+  echo "Existing cron job for today removed: $EXISTING_CRON_JOB"
+  echo "Adding new cron job for tomorrow: $CRON_JOB"
+else
+  echo "No existing cron job for today. Adding new cron job for tomorrow: $CRON_JOB"
+fi
+
+# Add the new cron job for tomorrow
+(crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
 
 # get version new of egp-agent
 echo 'download new version of egp-agent'
