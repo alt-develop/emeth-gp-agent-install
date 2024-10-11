@@ -4,6 +4,7 @@
 OS_USER_NAME="egp-user"
 COMMAND_UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
 KEY_JOB_UPDATE="JOB_UPDATE"
+KEY_CRON_CREATE_JOB_UPDATE="CREATE_JOB_UPDATE"
 
 RANDOM_HOUR=$(shuf -i 0-23 -n 1)
 RANDOM_MINUTE=$(shuf -i 1-59 -n 1)
@@ -25,11 +26,16 @@ fi
 
 echo "Cron job has been updated to run at $RANDOM_HOUR:$RANDOM_MINUTE at $TOMORROW/$MONTH/$YEAR"
 
-# Check command line parameters
-if [ "$1" != "$KEY_JOB_UPDATE" ]; then
-    echo "Exiting because parameter does not match $KEY_JOB_UPDATE"
-    exit 0
+crontab -l 2>/dev/null | grep -F "$KEY_CRON_CREATE_JOB_UPDATE" > /dev/null
+if [ $? -eq 0 ]; then
+    # Xóa cron job
+    (crontab -l 2>/dev/null | grep -v "$KEY_CRON_CREATE_JOB_UPDATE") | crontab -
 fi
+# Check command line parameters
+# if [ "$1" != "$KEY_JOB_UPDATE" ]; then
+#     echo "Exiting because parameter does not match $KEY_JOB_UPDATE"
+#     exit 0
+# fi
 
 # get version new of egp-agent
 echo 'download new version of egp-agent'
