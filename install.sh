@@ -5,6 +5,7 @@ OS_USER_NAME="egp-user"
 CONFIG="/home/${OS_USER_NAME}/egp-agent-config.yaml"
 MINIMUM_REQUIRED_STORAGE_GB=200 # 200GB
 DEFAULT_INSTALL_DIR='/opt/egp_agent'
+KEY_CRON_CREATE_JOB_UPDATE="CREATE_JOB_UPDATE"
 
 
 # Check if the required packages are installed
@@ -279,7 +280,6 @@ echo 'download update.sh file...'
 sudo curl -o /home/"$OS_USER_NAME"/update.sh https://raw.githubusercontent.com/alt-develop/egp-agent/main/update.sh
 RANDOM=$(od -An -N2 -i /dev/urandom | tr -d ' ')
 UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
-KEY_CRON_CREATE_JOB_UPDATE="#CREATE_JOB_UPDATE"
 # Ensure the update script is executable
 sudo chmod +x $UPDATE_SCRIPT
 # Set a random time for the cron job
