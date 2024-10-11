@@ -279,16 +279,21 @@ echo 'download update.sh file...'
 sudo curl -o /home/"$OS_USER_NAME"/update.sh https://raw.githubusercontent.com/alt-develop/egp-agent/main/update.sh
 RANDOM=$(od -An -N2 -i /dev/urandom | tr -d ' ')
 UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
+KEY_CRON_CREATE_JOB_UPDATE="#CREATE_JOB_UPDATE"
 # Ensure the update script is executable
 sudo chmod +x $UPDATE_SCRIPT
 # Set a random time for the cron job
-RANDOM_MINUTE=$(($RANDOM % 60))
-RANDOM_HOUR=$(($RANDOM % 24))
-echo "Random minute: $RANDOM_MINUTE"
-echo "Random hour: $RANDOM_HOUR"
+crontab -l 2>/dev/null | grep -F "$KEY_CRON_CREATE_JOB_UPDATE" > /dev/null
+if [ $? -eq 0 ]; then
+    echo "Cron #CREATE_JOB_UPDATE already exists, will be overwritten."
+    # Xóa cron job hiện tại chứa lệnh này
+    (crontab -l 2>/dev/null | grep -v "$KEY_CRON_CREATE_JOB_UPDATE") | crontab -
+else
+    echo "Cron #CREATE_JOB_UPDATE does not exist yet, will be created."
+fi
 
 # Add the cron job
-(crontab -l ; echo "$RANDOM_MINUTE $RANDOM_HOUR * * * $UPDATE_SCRIPT") | crontab -
+(crontab -l ; echo "0 0 * * * $UPDATE_SCRIPT $KEY_CRON_CREATE_JOB_UPDATE") | crontab -
 
 # Permission setup
 sudo mkdir -p /home/"$OS_USER_NAME"/.ssh
