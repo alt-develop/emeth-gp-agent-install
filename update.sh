@@ -42,31 +42,19 @@ fi
 # Compare the two versions
 if [ "$OLD_VERSION" != "$NEW_VERSION" ]; then
     echo "Versions are different: Old ($OLD_VERSION) vs New ($NEW_VERSION)"
-    # Check if egp-agent is running
-    if pgrep -x "egp-agent" > /dev/null; then
-      echo "egp-agent is running. Waiting for it to complete..."
 
-      # Stop the currently running egp-agent
-      sudo systemctl stop egp-agent
+    sudo systemctl stop egp-agent
 
-      # Wait for egp-agent to finish its current process
-      while pgrep -x "egp-agent" > /dev/null; do
-        echo "Waiting for egp-agent to stop..."
-        sleep 10
-      done
+    # Update the egp-agent binary
+    sudo mv /home/"$OS_USER_NAME"/egp-agent-new /home/"$OS_USER_NAME"/egp-agent
+    sudo chmod 700 /home/"$OS_USER_NAME"/egp-agent
+    echo 'egp-agent binary moved successfully.'
 
-      echo "egp-agent has completed. Proceeding with the update."
-
-      # Update the egp-agent binary
-      sudo mv /home/"$OS_USER_NAME"/egp-agent-new /home/"$OS_USER_NAME"/egp-agent
-      sudo chmod 700 /home/"$OS_USER_NAME"/egp-agent
-      echo 'egp-agent binary moved successfully.'
-
-      # Start the new version of egp-agent
-      sudo systemctl start egp-agent
-      echo "New version of egp-agent started."
-      
-    fi
+    # Start the new version of egp-agent
+    sudo systemctl start egp-agent
+    
+    echo "New version of egp-agent started."
+    
 else
   echo "Versions are the same: $OLD_VERSION"
 fi
