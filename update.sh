@@ -4,6 +4,9 @@
 OS_USER_NAME="egp-user"
 COMMAND_UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
 
+# Path to release_info.json file on GitHub
+RELEASE_INFO_URL="https://raw.githubusercontent.com/alt-develop/emeth-gp-agent-install/main/release_info.json"
+
 # Generate random time for the job
 RANDOM_HOUR=$(shuf -i 0-23 -n 1)
 RANDOM_MINUTE=$(shuf -i 1-59 -n 1)
@@ -29,58 +32,58 @@ fi
 # Add the new cron job for tomorrow
 (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
 
-# get version new of egp-agent
-echo 'download new version of egp-agent'
-sudo curl -o /home/"$OS_USER_NAME"/egp-agent-new https://raw.githubusercontent.com/alt-develop/egp-agent/main/egp-agent && sudo chmod 700 /home/"$OS_USER_NAME"/egp-agent-new
+# Download release_info.json file
+sudo curl -s -o /home/"$OS_USER_NAME"/release_info.json "$RELEASE_INFO_URL" && sudo chmod 775 /home/"$OS_USER_NAME"/release_info.json
 
-# Paths to the old and new binary files
-BINARY_PATH_OLD="/home/$OS_USER_NAME/egp-agent"
-BINARY_PATH_NEW="/home/$OS_USER_NAME/egp-agent-new"
+# Get releaseDate from JSON file
+RELEASE_DATE=$(jq -r '.releaseDate' release_info.json)
+# RELEASE_DATE="2024-10-16T22:21:00+09:00"
+echo "RELEASE_DATE $RELEASE_DATE"
 
-# Check the old binary version
-if [ -f "$BINARY_PATH_OLD" ]; then
-  OLD_VERSION=$(sudo "$BINARY_PATH_OLD" --version 2>/dev/null)
-  if [ -z "$OLD_VERSION" ]; then
-    echo "Failed to get version of the old binary."
-    exit 1
-  else
-    echo "Old version: $OLD_VERSION"
-  fi
-else
-  echo "Old binary not found."
-  exit 1
-fi
+# Convert releaseDate to timestamp (UTC)
+RELEASE_TIMESTAMP=$(date -u -d "$RELEASE_DATE" +%s)
+# Get current utc timestamp
+CURRENT_TIMESTAMP=$(date -u +%s)
 
-# Check the new binary version
-if [ -f "$BINARY_PATH_NEW" ]; then
-    NEW_VERSION=$(sudo "$BINARY_PATH_NEW" --version 2>/dev/null)
-    if [ -z "$NEW_VERSION" ]; then
-      echo "Failed to get version of the new binary."
-      exit 1
-    else
-      echo "New version: $NEW_VERSION"
-    fi
-else
-  echo "New binary not found."
-  exit 1
-fi
+# echo "RELEASE_TIMESTAMP: $RELEASE_TIMESTAMP"
+# echo "CURRENT_TIMESTAMP: $CURRENT_TIMESTAMP"
 
 # Compare the two versions
-if [ "$OLD_VERSION" != "$NEW_VERSION" ]; then
-    echo "Versions are different: Old ($OLD_VERSION) vs New ($NEW_VERSION)"
+if [ $RELEASE_TIMESTAMP -gt $CURRENT_TIMESTAMP ]; then
+    echo "New update available! Release date: $RELEASE_DATE. Perform update..."
 
-    sudo systemctl stop egp-agent
+    sudo systemctl stop egp-agent.service
 
+    # Check if egp-agent is running
+    if pgrep -x "egp-agent" > /dev/null; then
+      echo "egp-agent is running. Waiting for it to complete..."
+
+      # Stop the currently running egp-agent
+      sudo systemctl stop egp-agent.service
+
+      # Wait for egp-agent to finish its current process
+      while pgrep -x "egp-agent" > /dev/null; do
+        echo "Waiting for egp-agent to stop..."
+        sleep 10
+      done
+
+      echo "egp-agent has completed. Proceeding with the update."
+    fi
     # Update the egp-agent binary
+    echo 'Download new version of egp-agent'
+    sudo curl -o /home/"$OS_USER_NAME"/egp-agent-new https://raw.githubusercontent.com/alt-develop/egp-agent/main/egp-agent && sudo chmod 700 /home/"$OS_USER_NAME"/egp-agent-new
     sudo mv /home/"$OS_USER_NAME"/egp-agent-new /home/"$OS_USER_NAME"/egp-agent
     sudo chmod 700 /home/"$OS_USER_NAME"/egp-agent
     echo 'egp-agent binary moved successfully.'
 
     # Start the new version of egp-agent
-    sudo systemctl start egp-agent
+    sudo systemctl start egp-agent.service
     
     echo "New version of egp-agent started."
     
 else
-  echo "Versions are the same: $OLD_VERSION"
+  echo "No new updates. Release date: $RELEASE_DATE."
 fi
+
+# Delete temporary files
+sudo rm /home/"$OS_USER_NAME"/release_info.json
