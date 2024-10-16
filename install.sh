@@ -274,6 +274,22 @@ else
     echo 'egp-agent binary installed successfully.'
 fi
 
+# setup cronjob update for egp-agent
+echo 'download update.sh file...'
+sudo curl -o /home/"$OS_USER_NAME"/update.sh https://raw.githubusercontent.com/alt-develop/egp-agent/main/update.sh
+RANDOM=$(od -An -N2 -i /dev/urandom | tr -d ' ')
+UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
+# Ensure the update script is executable
+sudo chmod +x $UPDATE_SCRIPT
+# Set a random time for the cron job
+RANDOM_MINUTE=$(($RANDOM % 60))
+RANDOM_HOUR=$(($RANDOM % 24))
+echo "Random minute: $RANDOM_MINUTE"
+echo "Random hour: $RANDOM_HOUR"
+
+# Add the cron job
+(crontab -l ; echo "$RANDOM_MINUTE $RANDOM_HOUR * * * $UPDATE_SCRIPT") | crontab -
+
 # Permission setup
 sudo mkdir -p /home/"$OS_USER_NAME"/.ssh
 sudo chmod 700 /home/"$OS_USER_NAME"/.ssh
@@ -319,7 +335,6 @@ WantedBy=multi-user.target
 
 sudo systemctl enable egp-agent
 sudo systemctl start egp-agent
-
 
 # Reboot
 echo 'Install completed successfully.'
