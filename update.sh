@@ -68,6 +68,8 @@ if [ $RELEASE_TIMESTAMP -gt $CURRENT_TIMESTAMP ]; then
       done
 
       echo "egp-agent has completed. Proceeding with the update."
+    else
+      echo "egp-agent has been stopped"
     fi
     # Update the egp-agent binary
     echo 'Download new version of egp-agent'
