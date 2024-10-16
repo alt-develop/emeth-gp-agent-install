@@ -336,6 +336,7 @@ WantedBy=multi-user.target
 sudo systemctl enable egp-agent
 sudo systemctl start egp-agent
 
+
 # Reboot
 echo 'Install completed successfully.'
 echo 'Please reboot the system to apply the changes.'
