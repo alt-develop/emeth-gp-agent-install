@@ -3,6 +3,7 @@
 # Set constant variables
 OS_USER_NAME="egp-user"
 COMMAND_UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
+ROOT_DIR_UPDATE=/home/"$OS_USER_NAME"
 
 # Path to release_info.json file on GitHub
 RELEASE_INFO_URL="https://raw.githubusercontent.com/alt-develop/emeth-gp-agent-install/main/release_info.json"
@@ -33,49 +34,34 @@ fi
 (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
 
 # Download release_info.json file
-sudo curl -s -o /home/"$OS_USER_NAME"/release_info.json "$RELEASE_INFO_URL" && sudo chmod 775 /home/"$OS_USER_NAME"/release_info.json
+sudo curl -s -o "$ROOT_DIR_UPDATE"/release_info.json "$RELEASE_INFO_URL" && sudo chmod 775 "$ROOT_DIR_UPDATE"/release_info.json
 
 # Get releaseDate from JSON file
-RELEASE_DATE=$(jq -r '.releaseDate' release_info.json)
+RELEASE_DATE=$(jq -r '.releaseDate' "$ROOT_DIR_UPDATE"/release_info.json)
 # RELEASE_DATE="2024-10-16T22:21:00+09:00"
 echo "RELEASE_DATE $RELEASE_DATE"
 
 # Convert releaseDate to timestamp (UTC)
 RELEASE_TIMESTAMP=$(date -u -d "$RELEASE_DATE" +%s)
-# Get current utc timestamp
-CURRENT_TIMESTAMP=$(date -u +%s)
+
+# Get last update time of egp-agent file
+MODIFIED_DATE=$(stat -c %w "$ROOT_DIR_UPDATE"/egp-agent)
+MODIFIED_TIMESTAMP=$(date -d "$MODIFIED_DATE" +%s)
 
 # echo "RELEASE_TIMESTAMP: $RELEASE_TIMESTAMP"
-# echo "CURRENT_TIMESTAMP: $CURRENT_TIMESTAMP"
+# echo "MODIFIED_TIMESTAMP: $MODIFIED_TIMESTAMP"
 
 # Compare the two versions
-if [ $RELEASE_TIMESTAMP -gt $CURRENT_TIMESTAMP ]; then
+if [ $RELEASE_TIMESTAMP -gt $MODIFIED_TIMESTAMP ]; then
     echo "New update available! Release date: $RELEASE_DATE. Perform update..."
 
     sudo systemctl stop egp-agent.service
 
-    # Check if egp-agent is running
-    if pgrep -x "egp-agent" > /dev/null; then
-      echo "egp-agent is running. Waiting for it to complete..."
-
-      # Stop the currently running egp-agent
-      sudo systemctl stop egp-agent.service
-
-      # Wait for egp-agent to finish its current process
-      while pgrep -x "egp-agent" > /dev/null; do
-        echo "Waiting for egp-agent to stop..."
-        sleep 10
-      done
-
-      echo "egp-agent has completed. Proceeding with the update."
-    else
-      echo "egp-agent has been stopped"
-    fi
     # Update the egp-agent binary
     echo 'Download new version of egp-agent'
-    sudo curl -o /home/"$OS_USER_NAME"/egp-agent-new https://raw.githubusercontent.com/alt-develop/egp-agent/main/egp-agent && sudo chmod 700 /home/"$OS_USER_NAME"/egp-agent-new
-    sudo mv /home/"$OS_USER_NAME"/egp-agent-new /home/"$OS_USER_NAME"/egp-agent
-    sudo chmod 700 /home/"$OS_USER_NAME"/egp-agent
+    sudo curl -o "$ROOT_DIR_UPDATE"/egp-agent-new https://raw.githubusercontent.com/alt-develop/egp-agent/main/egp-agent && sudo chmod 700 "$ROOT_DIR_UPDATE"/egp-agent-new
+    sudo mv "$ROOT_DIR_UPDATE"/egp-agent-new "$ROOT_DIR_UPDATE"/egp-agent
+    sudo chmod 700 "$ROOT_DIR_UPDATE"/egp-agent
     echo 'egp-agent binary moved successfully.'
 
     # Start the new version of egp-agent
@@ -88,4 +74,4 @@ else
 fi
 
 # Delete temporary files
-sudo rm /home/"$OS_USER_NAME"/release_info.json
+sudo rm "$ROOT_DIR_UPDATE"/release_info.json
