@@ -9,7 +9,6 @@ RELEASE_INFO_URL="https://raw.githubusercontent.com/alt-develop/emeth-gp-agent-i
 
 # Get releaseDate from JSON file
 RELEASE_DATE=$(curl -s "$RELEASE_INFO_URL" | jq -er 'try .releaseDate // empty') || { echo "Error: Invalid JSON or no releaseDate"; exit 1; }
-
 echo "RELEASE_DATE $RELEASE_DATE"
 
 # Convert releaseDate to timestamp (UTC)
@@ -43,4 +42,3 @@ if [ $RELEASE_TIMESTAMP -gt $MODIFIED_TIMESTAMP ]; then
 else
   echo "No new updates. Release date: $RELEASE_DATE."
 fi
-
