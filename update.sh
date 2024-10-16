@@ -8,12 +8,12 @@ ROOT_DIR_UPDATE=/home/"$OS_USER_NAME"
 RELEASE_INFO_URL="https://raw.githubusercontent.com/alt-develop/emeth-gp-agent-install/main/release_info.json"
 
 # Get releaseDate from JSON file
-RELEASE_DATE=$(curl -s "$RELEASE_INFO_URL" | jq -er 'try .releaseDate // empty') || { echo "Error: Invalid JSON or no releaseDate"; exit 1; }
+RELEASE_DATE=$(curl -s "$RELEASE_INFO_URL" | jq -er '.releaseDate | select(type == "string" and length > 0)') || { echo "Error: Invalid JSON or no releaseDate"; exit 1; }
 # RELEASE_DATE="2024-10-16T22:21:00+09:00"
 echo "RELEASE_DATE $RELEASE_DATE"
 
 # Convert releaseDate to timestamp (UTC)
-RELEASE_TIMESTAMP=$(date -u -d "$RELEASE_DATE" +%s)
+RELEASE_TIMESTAMP=$(date -u -d "$RELEASE_DATE" +%s 2>/dev/null) || { echo "Error: releaseDate is not a valid date format"; exit 1; }
 
 # Get last update time of egp-agent file
 MODIFIED_DATE=$(stat -c %w "$ROOT_DIR_UPDATE"/egp-agent)
