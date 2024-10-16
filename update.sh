@@ -2,36 +2,10 @@
 
 # Set constant variables
 OS_USER_NAME="egp-user"
-COMMAND_UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
 ROOT_DIR_UPDATE=/home/"$OS_USER_NAME"
 
 # Path to release_info.json file on GitHub
 RELEASE_INFO_URL="https://raw.githubusercontent.com/alt-develop/emeth-gp-agent-install/main/release_info.json"
-
-# Generate random time for the job
-RANDOM_HOUR=$(shuf -i 0-23 -n 1)
-RANDOM_MINUTE=$(shuf -i 1-59 -n 1)
-
-# Set schedule for tomorrow
-TOMORROW=$(date -d "tomorrow" +%d)
-MONTH=$(date +%m)
-CRON_SCHEDULE="$RANDOM_MINUTE $RANDOM_HOUR $TOMORROW $MONTH *"
-CRON_JOB="$CRON_SCHEDULE $COMMAND_UPDATE_SCRIPT"
-
-# Check if a cron job exists for today
-EXISTING_CRON_JOB=$(crontab -l 2>/dev/null | grep -F "$COMMAND_UPDATE_SCRIPT")
-
-if [ -n "$EXISTING_CRON_JOB" ]; then
-  # Remove the existing cron job for today
-  (crontab -l 2>/dev/null | grep -v -F "$COMMAND_UPDATE_SCRIPT") | crontab -
-  echo "Existing cron job for today removed: $EXISTING_CRON_JOB"
-  echo "Adding new cron job for tomorrow: $CRON_JOB"
-else
-  echo "No existing cron job for today. Adding new cron job for tomorrow: $CRON_JOB"
-fi
-
-# Add the new cron job for tomorrow
-(crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
 
 # Download release_info.json file
 sudo curl -s -o "$ROOT_DIR_UPDATE"/release_info.json "$RELEASE_INFO_URL" && sudo chmod 775 "$ROOT_DIR_UPDATE"/release_info.json
@@ -48,8 +22,8 @@ RELEASE_TIMESTAMP=$(date -u -d "$RELEASE_DATE" +%s)
 MODIFIED_DATE=$(stat -c %w "$ROOT_DIR_UPDATE"/egp-agent)
 MODIFIED_TIMESTAMP=$(date -d "$MODIFIED_DATE" +%s)
 
-# echo "RELEASE_TIMESTAMP: $RELEASE_TIMESTAMP"
-# echo "MODIFIED_TIMESTAMP: $MODIFIED_TIMESTAMP"
+echo "RELEASE_TIMESTAMP: $RELEASE_TIMESTAMP"
+echo "MODIFIED_TIMESTAMP: $MODIFIED_TIMESTAMP"
 
 # Compare the two versions
 if [ $RELEASE_TIMESTAMP -gt $MODIFIED_TIMESTAMP ]; then
