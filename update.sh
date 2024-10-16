@@ -7,12 +7,9 @@ ROOT_DIR_UPDATE=/home/"$OS_USER_NAME"
 # Path to release_info.json file on GitHub
 RELEASE_INFO_URL="https://raw.githubusercontent.com/alt-develop/emeth-gp-agent-install/main/release_info.json"
 
-# Download release_info.json file
-sudo curl -s -o "$ROOT_DIR_UPDATE"/release_info.json "$RELEASE_INFO_URL" && sudo chmod 775 "$ROOT_DIR_UPDATE"/release_info.json
-
 # Get releaseDate from JSON file
-RELEASE_DATE=$(jq -r '.releaseDate' "$ROOT_DIR_UPDATE"/release_info.json)
-# RELEASE_DATE="2024-10-16T22:21:00+09:00"
+RELEASE_DATE=$(curl -s "$RELEASE_INFO_URL" | jq -er 'try .releaseDate // empty') || { echo "Error: Invalid JSON or no releaseDate"; exit 1; }
+
 echo "RELEASE_DATE $RELEASE_DATE"
 
 # Convert releaseDate to timestamp (UTC)
@@ -47,5 +44,3 @@ else
   echo "No new updates. Release date: $RELEASE_DATE."
 fi
 
-# Delete temporary files
-sudo rm "$ROOT_DIR_UPDATE"/release_info.json
