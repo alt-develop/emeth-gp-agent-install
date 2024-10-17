@@ -33,7 +33,7 @@ if [ $RELEASE_TIMESTAMP -gt $MODIFIED_TIMESTAMP ]; then
     sudo curl -o "$ROOT_DIR_UPDATE"/egp-agent-new https://raw.githubusercontent.com/alt-develop/egp-agent/main/egp-agent && sudo chmod 700 "$ROOT_DIR_UPDATE"/egp-agent-new
     sudo mv "$ROOT_DIR_UPDATE"/egp-agent-new "$ROOT_DIR_UPDATE"/egp-agent
     sudo chmod 700 "$ROOT_DIR_UPDATE"/egp-agent
-    sudo chown egp-user:egp-user "$ROOT_DIR_UPDATE"/egp-agent
+    sudo chown "$OS_USER_NAME":"$OS_USER_NAME" "$ROOT_DIR_UPDATE"/egp-agent
     echo 'egp-agent binary moved successfully.'
 
     # Start the new version of egp-agent
