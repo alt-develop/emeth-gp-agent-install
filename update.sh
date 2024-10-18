@@ -30,7 +30,7 @@ if [ $RELEASE_TIMESTAMP -gt $MODIFIED_TIMESTAMP ]; then
 
     # Update the egp-agent binary
     echo 'Download new version of egp-agent'
-    sudo curl -o "$ROOT_DIR_UPDATE"/egp-agent-new https://raw.githubusercontent.com/alt-develop/egp-agent/main/egp-agent && sudo chmod 700 "$ROOT_DIR_UPDATE"/egp-agent-new
+    sudo curl -o "$ROOT_DIR_UPDATE"/egp-agent-new https://raw.githubusercontent.com/alt-develop/egp-agent/main/egp-agent
     sudo mv "$ROOT_DIR_UPDATE"/egp-agent-new "$ROOT_DIR_UPDATE"/egp-agent
     sudo chmod 700 "$ROOT_DIR_UPDATE"/egp-agent
     sudo chown "$OS_USER_NAME":"$OS_USER_NAME" "$ROOT_DIR_UPDATE"/egp-agent
