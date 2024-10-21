@@ -327,7 +327,7 @@ After=network.target
 
 [Service]
 Environment='VAGRANT_HOME=${storage_mount_path}/.vagrant.d'
-Environment='VAGRANT_LOG=info'
+Environment='VAGRANT_LOG=warn'
 Type=simple
 User=${OS_USER_NAME}
 Group=${OS_USER_NAME}
