@@ -288,13 +288,17 @@ UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
 # Ensure the update script is executable
 sudo chmod +x $UPDATE_SCRIPT
 # Set a random time for the cron job
-RANDOM_MINUTE=$(($RANDOM % 60))
-RANDOM_HOUR=$(($RANDOM % 24))
-echo "Random minute: $RANDOM_MINUTE"
-echo "Random hour: $RANDOM_HOUR"
+if ! $(crontab -l | grep "$UPDATE_SCRIPT" > /dev/null); then
+    RANDOM_MINUTE=$(($RANDOM % 60))
+    RANDOM_HOUR=$(($RANDOM % 24))
 
-# Add the cron job
-(crontab -l ; echo "$RANDOM_MINUTE $RANDOM_HOUR * * * $UPDATE_SCRIPT") | crontab -
+    # Add the cron job
+    (crontab -l ; echo "$RANDOM_MINUTE $RANDOM_HOUR * * * $UPDATE_SCRIPT") | crontab -
+    echo 'Cron job setup successfully.'
+    crontab -l
+else
+    echo 'Cron job already exists. Skipping cron job setup.'
+fi
 
 # Permission setup
 sudo mkdir -p /home/"$OS_USER_NAME"/.ssh
