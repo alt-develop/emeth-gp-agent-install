@@ -29,6 +29,10 @@ if ! guestfish --version  >/dev/null 2>&1; then
     echo 'This program requires libguestfs-tools to be installed.'
     missing_pkg=true
 fi
+if ! bc --version  >/dev/null 2>&1; then
+    echo 'This program requires bc to be installed.'
+    missing_pkg=true
+fi
 
 
 if [ "$missing_pkg" = true ]; then
@@ -37,7 +41,7 @@ if [ "$missing_pkg" = true ]; then
     echo '--------------------------------------------'
     echo 'sudo apt-get update \'
     echo '&& sudo apt-get upgrade -y \'
-    echo '&& sudo apt-get install -y qemu-kvm qemu-utils libvirt-daemon-system libvirt-clients libvirt-dev libguestfs-tools bridge-utils virt-manager ovmf fio curl'
+    echo '&& sudo apt-get install -y qemu-kvm qemu-utils libvirt-daemon-system libvirt-clients libvirt-dev libguestfs-tools bridge-utils virt-manager ovmf fio curl bc'
     exit 1
 fi
 
@@ -160,7 +164,7 @@ if [ "$storage_allocate_gb" -lt "$MINIMUM_REQUIRED_STORAGE_GB" ] || [ "$storage_
     echo "Invalid storage limit. Please enter a value between $MINIMUM_REQUIRED_STORAGE_GB and $storage_allocate_max_gb GB."
     exit 1
 fi
-storage_limit_gb=$((storage_allocate_gb*0.99-METADATA_STORAGE_GB))
+storage_limit_gb=$(echo "$storage_allocate_gb * 0.99 - $METADATA_STORAGE_GB" | bc)
 
 ### Network
 global_ip=$(curl -s ifconfig.me)
@@ -336,7 +340,6 @@ WantedBy=multi-user.target
 " | sudo tee /etc/systemd/system/egp-agent.service
 
 sudo systemctl enable egp-agent
-sudo systemctl start egp-agent
 
 
 # Reboot
