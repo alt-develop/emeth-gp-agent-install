@@ -3,7 +3,8 @@
 # Set constant variables
 OS_USER_NAME="egp-user"
 CONFIG="/home/${OS_USER_NAME}/egp-agent-config.yaml"
-MINIMUM_REQUIRED_STORAGE_GB=200 # 200GB
+MINIMUM_REQUIRED_STORAGE_GB=500
+METADATA_STORAGE_GB=200
 DEFAULT_INSTALL_DIR='/opt/egp_agent'
 
 
@@ -28,6 +29,10 @@ if ! guestfish --version  >/dev/null 2>&1; then
     echo 'This program requires libguestfs-tools to be installed.'
     missing_pkg=true
 fi
+if ! bc --version  >/dev/null 2>&1; then
+    echo 'This program requires bc to be installed.'
+    missing_pkg=true
+fi
 
 
 if [ "$missing_pkg" = true ]; then
@@ -36,7 +41,7 @@ if [ "$missing_pkg" = true ]; then
     echo '--------------------------------------------'
     echo 'sudo apt-get update \'
     echo '&& sudo apt-get upgrade -y \'
-    echo '&& sudo apt-get install -y qemu-kvm qemu-utils libvirt-daemon-system libvirt-clients libvirt-dev libguestfs-tools bridge-utils virt-manager ovmf fio curl'
+    echo '&& sudo apt-get install -y qemu-kvm qemu-utils libvirt-daemon-system libvirt-clients libvirt-dev libguestfs-tools bridge-utils virt-manager ovmf fio curl bc'
     exit 1
 fi
 
@@ -92,9 +97,9 @@ echo "$install_dir"
 if [ ! -d "$install_dir" ]; then
     sudo mkdir -p "$install_dir"
 fi
-storage_total_byte=$(df --output=avail "$install_dir" | tail -n +2)
-storage_total_gb=$(($storage_total_byte/1024/1024))
-if [ "$storage_total_gb" -lt "$MINIMUM_REQUIRED_STORAGE_GB" ]; then
+storage_avail_byte=$(df --output=avail "$install_dir" | tail -n +2)
+storage_avail_gb=$(($storage_avail_byte/1024/1024))
+if [ "$storage_avail_gb" -lt "$MINIMUM_REQUIRED_STORAGE_GB" ]; then
     echo "The storage path does not have enough space. Please input a path with at least ${MINIMUM_REQUIRED_STORAGE_GB}GB of free space."
     exit 1
 fi
@@ -105,7 +110,7 @@ echo '[Your Machine Specs]'
 echo '--------------------------------------------'
 echo "vCPU: $vcpu_total"
 echo "Memory(GB): $memory_total"
-echo "Storage(GB): $storage_total_gb [${install_dir}]"
+echo "Storage(GB): $storage_avail_gb [${install_dir}]"
 echo "GPU Devices:"
 echo "$gpu_devices"
 echo ''
@@ -152,13 +157,14 @@ if [ "$memory_limit" -lt 1 ] || [ "$memory_limit" -gt "$memory_limit_max" ]; the
 fi
 
 ### Storage
-storage_limit_max_gb="$storage_total_gb"
-read -p "Enter the amount of storage to allocate in GB ${MINIMUM_REQUIRED_STORAGE_GB}-${storage_limit_max_gb}) [$((storage_limit_max_gb-20))]: " storage_limit_gb
-storage_limit_gb=${storage_limit_gb:-"$((storage_limit_max_gb-20))"}
-if [ "$storage_limit_gb" -lt "$MINIMUM_REQUIRED_STORAGE_GB" ] || [ "$storage_limit_gb" -gt "$storage_limit_max_gb" ]; then
-    echo "Invalid storage limit. Please enter a value between $MINIMUM_REQUIRED_STORAGE_GB and $storage_limit_max_gb GB."
+storage_allocate_max_gb="$storage_avail_gb"
+read -p "Enter the amount of storage to allocate in GB ${MINIMUM_REQUIRED_STORAGE_GB}-${storage_allocate_max_gb}) [$((storage_allocate_max_gb))]: " storage_allocate_gb
+storage_allocate_gb=${storage_allocate_gb:-"$((storage_allocate_max_gb))"}
+if [ "$storage_allocate_gb" -lt "$MINIMUM_REQUIRED_STORAGE_GB" ] || [ "$storage_allocate_gb" -gt "$storage_allocate_max_gb" ]; then
+    echo "Invalid storage limit. Please enter a value between $MINIMUM_REQUIRED_STORAGE_GB and $storage_allocate_max_gb GB."
     exit 1
 fi
+storage_limit_gb=$(echo "$storage_allocate_gb * 0.99 - $METADATA_STORAGE_GB" | bc)
 
 ### Network
 global_ip=$(curl -s ifconfig.me)
@@ -170,7 +176,7 @@ echo '[Resource Allocation]'
 echo "CPU Name: $cpu_model_name"
 echo "vCPU: $vcpu_limit"
 echo "Memory(GB): $memory_limit"
-echo "Storage(GB): $storage_limit_gb"
+echo "Storage(GB): $storage_allocate_gb"
 if [ "$gpu_passthrough_agreement" = 'y' ]; then
     echo "GPU Devices:"
     echo "$gpu_devices"
@@ -230,13 +236,13 @@ echo 'Allocating storage...'
 if [ -f "$storage_img_path" ]; then
     echo 'Storage image already exists. Skipping storage allocation.'
 else
-    sudo qemu-img create -f raw "${storage_img_path}" "${storage_limit_gb}G" -o preallocation=full
-    sudo mkfs.ext4 "$storage_img_path"
+    sudo qemu-img create -f raw "${storage_img_path}" "${storage_allocate_gb}G"
+    sudo mkfs.xfs "$storage_img_path"
     sudo mkdir -p "$storage_mount_path"
     sudo mount -o loop "$storage_img_path" "$storage_mount_path"
 fi
 
-fstab_entry="${storage_img_path} ${storage_mount_path} ext4 loop 0 0"
+fstab_entry="${storage_img_path} ${storage_mount_path} xfs loop 0 0"
 if ! grep -Fq "$fstab_entry" /etc/fstab; then
     echo "$fstab_entry" | sudo tee -a /etc/fstab
 else
@@ -321,7 +327,7 @@ After=network.target
 
 [Service]
 Environment='VAGRANT_HOME=${storage_mount_path}/.vagrant.d'
-Environment='VAGRANT_LOG=info'
+Environment='VAGRANT_LOG=warn'
 Type=simple
 User=${OS_USER_NAME}
 Group=${OS_USER_NAME}
@@ -334,7 +340,6 @@ WantedBy=multi-user.target
 " | sudo tee /etc/systemd/system/egp-agent.service
 
 sudo systemctl enable egp-agent
-sudo systemctl start egp-agent
 
 
 # Reboot
