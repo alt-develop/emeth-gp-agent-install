@@ -9,6 +9,7 @@ DEFAULT_INSTALL_DIR='/opt/egp_agent'
 
 
 # Check if the required packages are installed
+missing_pkg=false
 if ! kvm --version >/dev/null 2>&1; then
     echo 'This program requires kvm to be installed.'
     missing_pkg=true
@@ -34,13 +35,12 @@ if ! bc --version  >/dev/null 2>&1; then
     missing_pkg=true
 fi
 
-
 if [ "$missing_pkg" = true ]; then
     echo 'Missing packages detected.'
     echo 'You can install the required packages by running the following commands:'
     echo '--------------------------------------------'
-    echo 'sudo apt-get update \'
-    echo '&& sudo apt-get upgrade -y \'
+    echo 'sudo apt-get update \\'
+    echo '&& sudo apt-get upgrade -y \\'
     echo '&& sudo apt-get install -y qemu-kvm qemu-utils libvirt-daemon-system libvirt-clients libvirt-dev libguestfs-tools bridge-utils virt-manager ovmf fio curl bc'
     exit 1
 fi
@@ -60,7 +60,7 @@ if [ "$missing_pkg" = true ]; then
 fi
 
 # Request the API key
-echo -e '\e[32m
+printf '\033[32m
 
 H   H  EEEEE L     L      OOO      U   U  SSSS EEEEE RRRR  
 H   H  E     L     L     O   O     U   U S     E     R   R 
@@ -68,10 +68,11 @@ HHHHH  EEEE  L     L     O   O     U   U  SSS  EEEE  RRRR
 H   H  E     L     L     O   O     U   U     S E     R  R  
 H   H  EEEEE LLLLL LLLLL  OOO       UUU  SSSS  EEEEE R   R 
 
-\e[0m'
-echo 'Please enter the your API key for the EMETH GPU POOL.'
+\033[0m\n'
+echo 'Please enter your API key for the EMETH GPU POOL.'
 echo '--------------------------------------------'
-read -p 'API Key: ' api_key
+printf 'API Key: '
+read api_key
 if [ -z "$api_key" ]; then
     echo 'API key is required.'
     exit 1
@@ -82,22 +83,23 @@ echo ''
 # Get the resource allocation amounts desired by the user
 ## Get the machine specs
 sudo update-pciids
-gpu_devices=$(lspci -nn | grep 'NVIDIA' | grep '3D controller\|VGA compatible controller')
-cpu_model_name=$(grep 'model name' /proc/cpuinfo | head -1 | awk -F': ' '{print $2}')
-vcpu_total=$(grep -c ^processor /proc/cpuinfo)
-memory_total=$(grep MemTotal /proc/meminfo | awk '{print int($2/1024/1024)}')
+gpu_devices=`lspci -nn | grep 'NVIDIA' | grep '3D controller\|VGA compatible controller'`
+cpu_model_name=`grep 'model name' /proc/cpuinfo | head -1 | awk -F': ' '{print $2}'`
+vcpu_total=`grep -c ^processor /proc/cpuinfo`
+memory_total=`grep MemTotal /proc/meminfo | awk '{print int($2/1024/1024)}'`
 
 echo 'Please enter the storage path to be used by egp-agent.'
 echo 'Will be used to store the VM disk images.'
 echo 'Make sure to input a path on a device with at least 200GB of free space.'
 echo '--------------------------------------------'
-read -p "Install directory [$DEFAULT_INSTALL_DIR]: " install_dir
+printf "Install directory [${DEFAULT_INSTALL_DIR}]: "
+read install_dir
 install_dir=${install_dir:-"$DEFAULT_INSTALL_DIR"}
 echo "$install_dir"
 if [ ! -d "$install_dir" ]; then
     sudo mkdir -p "$install_dir"
 fi
-storage_avail_byte=$(df --output=avail "$install_dir" | tail -n +2)
+storage_avail_byte=`df --output=avail "$install_dir" | tail -n +2`
 storage_avail_gb=$(($storage_avail_byte/1024/1024))
 if [ "$storage_avail_gb" -lt "$MINIMUM_REQUIRED_STORAGE_GB" ]; then
     echo "The storage path does not have enough space. Please input a path with at least ${MINIMUM_REQUIRED_STORAGE_GB}GB of free space."
@@ -118,19 +120,29 @@ echo ''
 
 ## Get the user input for the resource allocation
 ### GPU
+gpu_passthrough_agreement='n'
 if [ ! -z "$gpu_devices" ]; then
     echo 'Please enter the agreement to enable GPU passthrough.'
-    echo -e "\e[33mWARNING:
+    printf '\033[33mWARNING:
 Please be aware that if you proceed, this program will modify the grub settings to enable GPU Passthrough. 
-As a result of these changes, you will not be able to directly access the GPU from the Host OS.\e[0m"
+As a result of these changes, you will not be able to directly access the GPU from the Host OS.\033[0m\n'
     echo '--------------------------------------------'
-    read -p 'Do you want to proceed with the GPU passthrough? (y/n) [y]: ' gpu_passthrough_agreement
-    echo "$gpu_passthrough_agreement"
+    printf 'Do you want to proceed with the GPU passthrough? (y/n) [y]: '
+    read gpu_passthrough_agreement
     gpu_passthrough_agreement=${gpu_passthrough_agreement:-'y'}
+    echo "$gpu_passthrough_agreement"
     if [ "$gpu_passthrough_agreement" = "y" ]; then
-        gpu_model_name=$(echo "$gpu_devices" | awk -F'[' '{print $3}' | awk -F']' '{print $1}' | head -1)
-        gpu_pci_ids=$(echo "$gpu_devices" | awk -F']:' '{print $2}' | awk -F'[' '{print $3}' | awk -F']' '{print $1}' | uniq | sed 's/ /,/g')
-        gpu_pci_addresses=$(echo "$gpu_devices" | awk -F' ' '{print $1}')
+        gpu_model_name=`echo "$gpu_devices" | awk -F'[' '{print $3}' | awk -F']' '{print $1}' | head -1` # e.g. NVIDIA GeForce RTX 3090
+        gpu_pci_ids=`echo "$gpu_devices" | awk -F']:' '{print $2}' | awk -F'[' '{print $3}' | awk -F']' '{print $1}' | uniq | tr '\n' ',' | sed 's/,$//'` # e.g. 10de:2204,10de:1aef
+        gpu_pci_addresses=`echo "$gpu_devices" | awk -F' ' '{print $1}'`
+        gpu_pci_addresses_with_iommu=""
+        for gpu_pci_address in $gpu_pci_addresses; do
+            full_pci_address="0000:${gpu_pci_address}"
+            iommu_group=`readlink /sys/bus/pci/devices/${full_pci_address}/iommu_group | awk -F'/' '{print $NF}'`
+            devices_in_group=`ls /sys/kernel/iommu_groups/${iommu_group}/devices/`
+            device_list=`echo $devices_in_group | sed 's/0000://g' | tr ' ' ',' | tr '\n' ',' | sed 's/,$//'`
+            gpu_pci_addresses_with_iommu="${gpu_pci_addresses_with_iommu}${device_list}\n"
+        done
     else
         echo 'GPU passthrough canceled.'
     fi
@@ -139,8 +151,9 @@ As a result of these changes, you will not be able to directly access the GPU fr
 fi
 
 ### CPU
-vcpu_limit_max=$((vcpu_total-2))
-read -p "Enter the number of vCPU to allocate (1-${vcpu_limit_max}) [${vcpu_limit_max}]: " vcpu_limit
+vcpu_limit_max=$(($vcpu_total-2))
+printf "Enter the number of vCPU to allocate (1-${vcpu_limit_max}) [${vcpu_limit_max}]: "
+read vcpu_limit
 vcpu_limit=${vcpu_limit:-"$vcpu_limit_max"}
 if [ "$vcpu_limit" -lt 1 ] || [ "$vcpu_limit" -gt "$vcpu_limit_max" ]; then
     echo "Invalid vCPU limit. Please enter a value between 1 and $vcpu_limit_max."
@@ -148,8 +161,9 @@ if [ "$vcpu_limit" -lt 1 ] || [ "$vcpu_limit" -gt "$vcpu_limit_max" ]; then
 fi
 
 ### Memory
-memory_limit_max=$((memory_total-(memory_total/10)))
-read -p "Enter the amount of memory to allocate in GB (1-${memory_limit_max}) [${memory_limit_max}]: " memory_limit
+memory_limit_max=$(($memory_total-($memory_total/10)))
+printf "Enter the amount of memory to allocate in GB (1-${memory_limit_max}) [${memory_limit_max}]: "
+read memory_limit
 memory_limit=${memory_limit:-"$memory_limit_max"}
 if [ "$memory_limit" -lt 1 ] || [ "$memory_limit" -gt "$memory_limit_max" ]; then
     echo "Invalid memory limit. Please enter a value up to $memory_limit_max GB."
@@ -158,16 +172,17 @@ fi
 
 ### Storage
 storage_allocate_max_gb="$storage_avail_gb"
-read -p "Enter the amount of storage to allocate in GB ${MINIMUM_REQUIRED_STORAGE_GB}-${storage_allocate_max_gb}) [$((storage_allocate_max_gb))]: " storage_allocate_gb
-storage_allocate_gb=${storage_allocate_gb:-"$((storage_allocate_max_gb))"}
+printf "Enter the amount of storage to allocate in GB (${MINIMUM_REQUIRED_STORAGE_GB}-${storage_allocate_max_gb}) [${storage_allocate_max_gb}]: "
+read storage_allocate_gb
+storage_allocate_gb=${storage_allocate_gb:-"$storage_allocate_max_gb"}
 if [ "$storage_allocate_gb" -lt "$MINIMUM_REQUIRED_STORAGE_GB" ] || [ "$storage_allocate_gb" -gt "$storage_allocate_max_gb" ]; then
     echo "Invalid storage limit. Please enter a value between $MINIMUM_REQUIRED_STORAGE_GB and $storage_allocate_max_gb GB."
     exit 1
 fi
-storage_limit_gb=$(echo "$storage_allocate_gb * 0.99 - $METADATA_STORAGE_GB" | bc)
+storage_limit_gb=`echo "$storage_allocate_gb * 0.99 - $METADATA_STORAGE_GB" | bc`
 
 ### Network
-global_ip=$(curl -s ifconfig.me)
+global_ip=`curl -s ifconfig.me`
 
 ## Display the resource allocation
 echo ''
@@ -183,7 +198,8 @@ if [ "$gpu_passthrough_agreement" = 'y' ]; then
 fi
 echo '--------------------------------------------'
 echo ''
-read -p "Do you want to proceed with the resource allocation? (y/n) [y]: " proceed
+printf "Do you want to proceed with the resource allocation? (y/n) [y]: "
+read proceed
 echo ''
 
 proceed=${proceed:-"y"}
@@ -196,22 +212,29 @@ fi
 # Allocate the resources
 ## User setup
 echo "Creating user ${OS_USER_NAME} ..."
-sudo useradd -m "$OS_USER_NAME"
+if ! id -u "$OS_USER_NAME" >/dev/null 2>&1; then
+    sudo useradd -m "$OS_USER_NAME"
+fi
 sudo usermod -aG libvirt "$OS_USER_NAME"
 echo "${OS_USER_NAME} ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/"$OS_USER_NAME"
+## profile setup
+sudo -u "$OS_USER_NAME" echo "export VAGRANT_HOME=${install_dir}/.vagrant.d" | sudo tee /home/"$OS_USER_NAME"/.profile
+sudo -u "$OS_USER_NAME" echo "export VAGRANT_LOG=warn" | sudo tee -a /home/"$OS_USER_NAME"/.profile
 
 ## Setup the configuration file
 config_overwrite='y'
 echo 'Setting up the configuration file...'
 if [ -f "$CONFIG" ]; then
     echo 'Configuration file already exists.'
-    read -p 'Do you want to overwrite the configuration file? (y/n) [y]: ' config_overwrite
+    printf 'Do you want to overwrite the configuration file? (y/n) [y]: '
+    read config_overwrite
+    config_overwrite=${config_overwrite:-'y'}
 fi
 if [ ! "$config_overwrite" = 'n' ]; then
     echo '# egp-agent configurations' | sudo tee "$CONFIG"
     echo '' | sudo tee -a "$CONFIG"
     echo "api_key: ${api_key}" | sudo tee -a "$CONFIG"
-    echo "hostname: $(hostname)" | sudo tee -a "$CONFIG"
+    echo "hostname: `hostname`" | sudo tee -a "$CONFIG"
     echo "global_ip: ${global_ip}" | sudo tee -a "$CONFIG"
     echo "cpu_model_name: ${cpu_model_name}" | sudo tee -a "$CONFIG"
     echo "vcpu_limit: ${vcpu_limit}" | sudo tee -a "$CONFIG"
@@ -221,9 +244,10 @@ if [ ! "$config_overwrite" = 'n' ]; then
     echo "gpu_model_name: ${gpu_model_name}" | sudo tee -a "$CONFIG"
     echo "gpu_pci_adresses:" | sudo tee -a "$CONFIG"
     if [ "$gpu_passthrough_agreement" = 'y' ]; then
-        for gpu_pci_address in ${gpu_pci_addresses}
-        do
-            echo "  - '${gpu_pci_address}'" | sudo tee -a "$CONFIG"
+        echo "$gpu_pci_addresses_with_iommu" | while read device_list; do
+            if [ -n "$device_list" ]; then
+                echo "  - '$device_list'" | sudo tee -a "$CONFIG"
+            fi
         done
     fi
 fi
@@ -260,7 +284,7 @@ else
 fi
 
 ### setup vagrant storage
-echo "export VAGRANT_HOME=${storage_mount_path}/.vagrant.d" | sudo tee /home/"$OS_USER_NAME"/.profile
+echo "export VAGRANT_HOME=${storage_mount_path}/.vagrant.d" | sudo tee -a /home/"$OS_USER_NAME"/.profile
 
 ## GPU Passthrough
 if [ "$gpu_passthrough_agreement" = 'y' ]; then
@@ -281,19 +305,19 @@ else
 fi
 
 # setup cronjob update for egp-agent
-echo 'download update.sh file...'
+echo 'Downloading update.sh file...'
 sudo curl -o /home/"$OS_USER_NAME"/update.sh https://raw.githubusercontent.com/alt-develop/egp-agent/main/update.sh
-RANDOM=$(od -An -N2 -i /dev/urandom | tr -d ' ')
+RANDOM_NUM=`od -An -N2 -i /dev/urandom | tr -d ' '`
 UPDATE_SCRIPT="/home/$OS_USER_NAME/update.sh"
 # Ensure the update script is executable
 sudo chmod +x $UPDATE_SCRIPT
 # Set a random time for the cron job
-if ! $(crontab -l | grep "$UPDATE_SCRIPT" > /dev/null); then
-    RANDOM_MINUTE=$(($RANDOM % 60))
-    RANDOM_HOUR=$(($RANDOM % 24))
+if ! crontab -l 2>/dev/null | grep "$UPDATE_SCRIPT" > /dev/null; then
+    RANDOM_MINUTE=$(($RANDOM_NUM % 60))
+    RANDOM_HOUR=$(($RANDOM_NUM % 24))
 
     # Add the cron job
-    (crontab -l ; echo "$RANDOM_MINUTE $RANDOM_HOUR * * * $UPDATE_SCRIPT") | crontab -
+    (crontab -l 2>/dev/null ; echo "$RANDOM_MINUTE $RANDOM_HOUR * * * $UPDATE_SCRIPT") | crontab -
     echo 'Cron job setup successfully.'
     crontab -l
 else
@@ -309,11 +333,11 @@ sudo chown -R "$OS_USER_NAME":"$OS_USER_NAME" "$install_dir"
 
 # vagrant plugin setup
 echo 'Setting up vagrant plugin...'
-if sudo -iu "$OS_USER_NAME" vagrant plugin list | grep vagrant-libvirt; then
-    echo 'vagrant-libvirt plugin already installed. skipping plugin installation.'
+if sudo -Eu "$OS_USER_NAME" vagrant plugin list | grep vagrant-libvirt; then
+    echo 'vagrant-libvirt plugin already installed. Skipping plugin installation.'
 else
-    sudo -iu "$OS_USER_NAME" vagrant plugin install vagrant-libvirt
-    if ! sudo -iu "$OS_USER_NAME" vagrant plugin list | grep vagrant-libvirt; then
+    sudo -Eu "$OS_USER_NAME" vagrant plugin install vagrant-libvirt
+    if ! sudo -Eu "$OS_USER_NAME" vagrant plugin list | grep vagrant-libvirt; then
         echo 'Failed to install vagrant-libvirt plugin.'
         exit 1
     else
@@ -326,8 +350,6 @@ fi
 echo "[Unit]
 Description=egp-agent
 After=network.target
-
-
 
 [Service]
 Environment='VAGRANT_HOME=${storage_mount_path}/.vagrant.d'
@@ -349,7 +371,9 @@ sudo systemctl enable egp-agent
 # Reboot
 echo 'Install completed successfully.'
 echo 'Please reboot the system to apply the changes.'
-read -p 'Do you want to reboot now? (y/n) [y]: ' reboot
+printf 'Do you want to reboot now? (y/n) [y]: '
+read reboot
+reboot=${reboot:-'y'}
 if [ "$reboot" != "n" ]; then
     sudo reboot
 fi
