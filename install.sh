@@ -218,7 +218,7 @@ fi
 sudo usermod -aG libvirt "$OS_USER_NAME"
 echo "${OS_USER_NAME} ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/"$OS_USER_NAME"
 ## profile setup
-sudo -u egp-user echo "export VAGRANT_HOME=${install_dir}/.vagrant.d" | sudo tee /home/"$OS_USER_NAME"/.profile"
+sudo -u egp-user echo "export VAGRANT_HOME=${install_dir}/.vagrant.d" | sudo tee /home/"$OS_USER_NAME"/.profile
 sudo -u egp-user echo "export VAGRANT_LOG=warn" | sudo tee -a /home/"$OS_USER_NAME"/.profile"
 
 ## Setup the configuration file
