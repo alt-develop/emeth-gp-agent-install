@@ -217,9 +217,6 @@ if ! id -u "$OS_USER_NAME" >/dev/null 2>&1; then
 fi
 sudo usermod -aG libvirt "$OS_USER_NAME"
 echo "${OS_USER_NAME} ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/"$OS_USER_NAME"
-## profile setup
-sudo -u "$OS_USER_NAME" echo "export VAGRANT_HOME=${install_dir}/.vagrant.d" | sudo tee /home/"$OS_USER_NAME"/.profile
-sudo -u "$OS_USER_NAME" echo "export VAGRANT_LOG=warn" | sudo tee -a /home/"$OS_USER_NAME"/.profile
 
 ## Setup the configuration file
 config_overwrite='y'
@@ -284,7 +281,9 @@ else
 fi
 
 ### setup vagrant storage
-echo "export VAGRANT_HOME=${storage_mount_path}/.vagrant.d" | sudo tee -a /home/"$OS_USER_NAME"/.profile
+echo "export VAGRANT_HOME=${storage_mount_path}/.vagrant.d" | sudo tee /home/"$OS_USER_NAME"/.profile
+echo "export VAGRANT_LOG=warn" | sudo tee -a /home/"$OS_USER_NAME"/.profile
+
 
 ## GPU Passthrough
 if [ "$gpu_passthrough_agreement" = 'y' ]; then
@@ -333,11 +332,11 @@ sudo chown -R "$OS_USER_NAME":"$OS_USER_NAME" "$install_dir"
 
 # vagrant plugin setup
 echo 'Setting up vagrant plugin...'
-if sudo -Eu "$OS_USER_NAME" vagrant plugin list | grep vagrant-libvirt; then
+if sudo -iu "$OS_USER_NAME" vagrant plugin list | grep vagrant-libvirt; then
     echo 'vagrant-libvirt plugin already installed. Skipping plugin installation.'
 else
-    sudo -Eu "$OS_USER_NAME" vagrant plugin install vagrant-libvirt
-    if ! sudo -Eu "$OS_USER_NAME" vagrant plugin list | grep vagrant-libvirt; then
+    sudo -iu "$OS_USER_NAME" vagrant plugin install vagrant-libvirt
+    if ! sudo -iu "$OS_USER_NAME" vagrant plugin list | grep vagrant-libvirt; then
         echo 'Failed to install vagrant-libvirt plugin.'
         exit 1
     else
