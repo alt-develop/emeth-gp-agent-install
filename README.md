@@ -4,10 +4,10 @@
 
 ## Requirements
 
-- Linux OS
+- Ubuntu 22.04 LTS
 - Enable Virtualization in BIOS
 - Enable sudo access
-- Storage: 200GB or more
+- Storage: 500GB or more
 - KVM
 - Vagrant
 
