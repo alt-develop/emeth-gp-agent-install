@@ -217,6 +217,9 @@ if ! id -u "$OS_USER_NAME" >/dev/null 2>&1; then
 fi
 sudo usermod -aG libvirt "$OS_USER_NAME"
 echo "${OS_USER_NAME} ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/"$OS_USER_NAME"
+## profile setup
+sudo -u egp-user echo "export VAGRANT_HOME=${install_dir}/.vagrant.d" | sudo tee /home/"$OS_USER_NAME"/.profile"
+sudo -u egp-user echo "export VAGRANT_LOG=warn" | sudo tee -a /home/"$OS_USER_NAME"/.profile"
 
 ## Setup the configuration file
 config_overwrite='y'
@@ -330,11 +333,11 @@ sudo chown -R "$OS_USER_NAME":"$OS_USER_NAME" "$install_dir"
 
 # vagrant plugin setup
 echo 'Setting up vagrant plugin...'
-if sudo -u "$OS_USER_NAME" vagrant plugin list | grep vagrant-libvirt; then
+if sudo -Eu "$OS_USER_NAME" vagrant plugin list | grep vagrant-libvirt; then
     echo 'vagrant-libvirt plugin already installed. Skipping plugin installation.'
 else
-    sudo -u "$OS_USER_NAME" vagrant plugin install vagrant-libvirt
-    if ! sudo -u "$OS_USER_NAME" vagrant plugin list | grep vagrant-libvirt; then
+    sudo -Eu "$OS_USER_NAME" vagrant plugin install vagrant-libvirt
+    if ! sudo -Eu "$OS_USER_NAME" vagrant plugin list | grep vagrant-libvirt; then
         echo 'Failed to install vagrant-libvirt plugin.'
         exit 1
     else
