@@ -99,6 +99,14 @@ echo "$install_dir"
 if [ ! -d "$install_dir" ]; then
     sudo mkdir -p "$install_dir"
 fi
+
+# Check if CPU virtualization is enabled
+virtualization_enabled=$(lscpu | grep -i "Virtualization" | awk '{print $2}')
+if [ "$virtualization_enabled" != "VT-x" ] && [ "$virtualization_enabled" != "AMD-V" ]; then
+    echo "CPU virtualization is not enabled. Please enable it in the BIOS settings."
+    exit 1
+fi
+
 storage_avail_byte=`df --output=avail "$install_dir" | tail -n +2`
 storage_avail_gb=$(($storage_avail_byte/1024/1024))
 if [ "$storage_avail_gb" -lt "$MINIMUM_REQUIRED_STORAGE_GB" ]; then
