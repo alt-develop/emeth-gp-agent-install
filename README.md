@@ -10,6 +10,8 @@
 - Storage: 500GB or more
 - KVM
 - Vagrant
+- Not GPU Geforce Seriese
+  > Due to NVIDIA's license policy, hosting with Geforce series GPUs is prohibited. Please choose an appropriate GPU.
 
 ## Install
 
